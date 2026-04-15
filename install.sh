@@ -22,7 +22,7 @@ install_minecraft() {
     MC_CONTENTS=$MC_DIR/Contents
     mkdir -p $MC_CONTENTS
     MC_CONTENTS_FILES=$(ls -A $MC_CONTENTS)
-    if [ -z "$MC_CONTENTS_FILES" ]; then
+    if [ -n "$MC_CONTENTS_FILES" ]; then
         echo "Target installation directory is not empty. Aborting installation." && exit 1
     fi
     unzip $MC_ZIP_FILENAME -d $MC_CONTENTS
@@ -32,7 +32,7 @@ install_minecraft() {
 patch_curl() {
     echo -n "Patching networking tools... "
     # this might not work because of cloudflare
-    wget https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-curl-8.17.0-1-any.pkg.tar.zst
+    wget -q https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-curl-8.17.0-1-any.pkg.tar.zst
     if [ $? -ne 0 ]; then echo "Error downloading MinGW-cURL" && exit 1; fi
     tar -xf mingw-w64-x86_64-curl-8.17.0-1-any.pkg.tar.zst mingw64/bin/libcurl-4.dll
     # Overwrite built-in XCurl.dll
@@ -40,7 +40,7 @@ patch_curl() {
 
     CERTS_DIR=$MC_DIR/etc/ssl/certs
     mkdir -p $CERTS_DIR
-    wget https://curl.se/ca/cacert.pem
+    wget -q https://curl.se/ca/cacert.pem
     if [ $? -ne 0 ]; then echo "Error downloading certs" && exit 1; fi
     mv cacert.pem $CERTS_DIR/ca-bundle.crt
     echo "done."
@@ -58,7 +58,7 @@ install_gdk_proton() {
     if [ $? -ne 0 ]; then echo "Couldn't find a valid release for GDK-Proton" && exit 1; fi
 
     PROTON_RELEASE_FILENAME=$(echo "$PROTON_RELEASE_INFO" | jq -r .assets[0].name)
-    wget $PROTON_RELEASE_URL
+    wget -q $PROTON_RELEASE_URL
     if [ $? -ne 0 ]; then echo "Error downlading GDK-Proton" && exit 1; fi
 
     tar -zxf $PROTON_RELEASE_FILENAME -C $HOME/.steam/root/compatibilitytools.d
@@ -76,7 +76,7 @@ install_java() {
     JAVA_RELEASE_JSON=$(echo $JAVA_RELEASE_FULL_JSON | jq '.assets[] | select (.name | test("jdk_x64_linux_hotspot.*tar.gz$"))')
     JAVA_RELEASE_URL=$(echo $JAVA_RELEASE_JSON | jq -r .browser_download_url)
     JAVA_RELEASE_FILENAME=$(echo $JAVA_RELEASE_JSON | jq -r .name)
-    wget $JAVA_RELEASE_URL
+    wget -q $JAVA_RELEASE_URL
     if [ $? -ne 0 ]; then echo "Error downloading JDK" && exit 1; fi
 
     JDK_DIR_NAME=$(tar -ztf $JAVA_RELEASE_FILENAME | head -1)
@@ -92,7 +92,8 @@ install_java() {
 install_proxy_pass() {
     echo -n "Installing ProxyPass... "
     PROXY_PASS_DIR=$HOME/ProxyPass
-    wget https://github.com/Kas-tle/ProxyPass/releases/latest/ProxyPass.jar
+    wget -q https://github.com/Kas-tle/ProxyPass/releases/latest/download/ProxyPass.jar
+    if [ $? -ne 0 ]; then echo "Error downloading ProxyPass" && exit 1; fi
     mkdir -p $PROXY_PASS_DIR
     mv ProxyPass.jar $PROXY_PASS_DIR/
     mv wrapper.sh $PROXY_PASS_DIR/
