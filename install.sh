@@ -3,30 +3,45 @@ SCRIPT_DIR=$PWD
 
 MC_DIR=$HOME/Minecraft
 
-install_minecraft() {
-    echo -n "Extracting Minecraft... "
-    SEARCH_RESULTS=$(unzip -Z1 MCWindows.zip | grep Minecraft.Windows.exe)
+get_input() {
+    read -p "Enter filename of the zipped Minecraft contents or press enter for the default [MCWindows.zip]: " MC_ZIP_FILENAME
+    MC_ZIP_FILENAME=${MC_ZIP_FILENAME:-"MCWindows.zip"}
+    SEARCH_RESULTS=$(unzip -Z1 $MC_ZIP_FILENAME | grep Minecraft.Windows.exe)
     if [ "$SEARCH_RESULTS" != "Minecraft.Windows.exe" ]; then
-        echo "Invalid game contents: couldn't find Minecraft.Windows.exe at the top level" && exit 1
+        echo "Invalid game contents: couldn't find Minecraft.Windows.exe at the top level. It should contain everything inside the Contents folder." && exit 1
     fi
 
+    read -p "Enter the hostname or IP address of the destination server: " PROXY_PASS_DESTINATION_HOST
+    if [ -z "$PROXY_PASS_DESTINATION_HOST" ]; then
+        echo "Must provide a non-empty host/IP for the destination server." && exit 1
+    fi
+}
+
+install_minecraft() {
+    echo -n "Extracting Minecraft... "
     MC_CONTENTS=$MC_DIR/Contents
     mkdir -p $MC_CONTENTS
-    unzip MCWindows.zip -d $MC_CONTENTS
+    MC_CONTENTS_FILES=$(ls -A $MC_CONTENTS)
+    if [ -z "$MC_CONTENTS_FILES" ]; then
+        echo "Target installation directory is not empty. Aborting installation." && exit 1
+    fi
+    unzip $MC_ZIP_FILENAME -d $MC_CONTENTS
     echo "done."
 }
 
 patch_curl() {
     echo -n "Patching networking tools... "
     # this might not work because of cloudflare
-    wget https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-curl-8.17.0-1-any.pkg.tar.zst || exit 1
+    wget https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-curl-8.17.0-1-any.pkg.tar.zst
+    if [ $? -ne 0 ]; then echo "Error downloading MinGW-cURL" && exit 1; fi
     tar -xf mingw-w64-x86_64-curl-8.17.0-1-any.pkg.tar.zst mingw64/bin/libcurl-4.dll
     # Overwrite built-in XCurl.dll
     mv libcurl-4.dll $MC_CONTENTS/XCurl.dll
 
     CERTS_DIR=$MC_DIR/etc/ssl/certs
     mkdir -p $CERTS_DIR
-    wget https://curl.se/ca/cacert.pem || exit 1
+    wget https://curl.se/ca/cacert.pem
+    if [ $? -ne 0 ]; then echo "Error downloading certs" && exit 1; fi
     mv cacert.pem $CERTS_DIR/ca-bundle.crt
     echo "done."
 }
@@ -37,10 +52,15 @@ install_gdk_proton() {
     if [ "${EXISTING_GE_COUNT:-0}" -gt 0 ]; then
         echo "already installed." && return
     fi
+
     PROTON_RELEASE_INFO=$(curl -s https://api.github.com/repos/Weather-OS/GDK-Proton/releases/latest)
     PROTON_RELEASE_URL=$(echo "$PROTON_RELEASE_INFO" | jq -r .assets[0].browser_download_url)
+    if [ $? -ne 0 ]; then echo "Couldn't find a valid release for GDK-Proton" && exit 1; fi
+
     PROTON_RELEASE_FILENAME=$(echo "$PROTON_RELEASE_INFO" | jq -r .assets[0].name)
-    wget $PROTON_RELEASE_URL || exit 1
+    wget $PROTON_RELEASE_URL
+    if [ $? -ne 0 ]; then echo "Error downlading GDK-Proton" && exit 1; fi
+
     tar -zxf $PROTON_RELEASE_FILENAME -C $HOME/.steam/root/compatibilitytools.d
     echo "done."
 }
@@ -51,13 +71,17 @@ install_java() {
         JAVA_EXE=java
         echo "already installed." && return
     fi
+
     JAVA_RELEASE_FULL_JSON=$(curl -s https://api.github.com/repos/adoptium/temurin25-binaries/releases/latest)
     JAVA_RELEASE_JSON=$(echo $JAVA_RELEASE_FULL_JSON | jq '.assets[] | select (.name | test("jdk_x64_linux_hotspot.*tar.gz$"))')
     JAVA_RELEASE_URL=$(echo $JAVA_RELEASE_JSON | jq -r .browser_download_url)
     JAVA_RELEASE_FILENAME=$(echo $JAVA_RELEASE_JSON | jq -r .name)
-    wget $JAVA_RELEASE_URL || exit 1
+    wget $JAVA_RELEASE_URL
+    if [ $? -ne 0 ]; then echo "Error downloading JDK" && exit 1; fi
+
     JDK_DIR_NAME=$(tar -ztf $JAVA_RELEASE_FILENAME | head -1)
     tar -zxf $JAVA_RELEASE_FILENAME -C $HOME/.local
+
     export JAVA_HOME=$HOME/.local/$JDK_DIR_NAME
     echo "JAVA_HOME=$HOME/.local/$JDK_DIR_NAME" >> $HOME/.bash_profile
     echo 'PATH=$PATH:$JAVA_HOME/bin' >> $HOME/.bash_profile
@@ -107,10 +131,6 @@ sign_in() {
 
 configure_proxy_pass() {
     # Apply the host to the proxy config
-    read -p "Enter the hostname or IP address of the destination server:" PROXY_PASS_DESTINATION_HOST
-    if [ -z "$PROXY_PASS_DESTINATION_HOST" ]; then
-        echo "Must provide a non-empty host for the destination server" && exit 1
-    fi
     sed -i '/destination/,${/host\: .*/{s/host: .*/host\: '"${PROXY_PASS_DESTINATION_HOST}"'/; :a; n; ba}}' config.yml
     echo "Configuration updated."
 }
@@ -139,6 +159,7 @@ EOF
     echo "$MSG"
 }
 
+get_input
 install_minecraft
 patch_curl
 install_gdk_proton
@@ -147,3 +168,5 @@ install_proxy_pass
 sign_in
 configure_proxy_pass
 post_install
+
+read -p "Press any key to exit." foo
