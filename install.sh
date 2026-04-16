@@ -37,9 +37,9 @@ print_progress() {
 }
 
 get_input() {
-    read -p "Enter filename of the zipped Minecraft contents or press enter for the default [MCWindows.zip]: " MC_ZIP_FILENAME
+    read -e -p "Enter filename of the zipped Minecraft contents or press enter for the default [MCWindows.zip]: " MC_ZIP_FILENAME
     MC_ZIP_FILENAME=${MC_ZIP_FILENAME:-"MCWindows.zip"}
-    ZIP_FILES=$(unzip -Z1 $MC_ZIP_FILENAME)
+    ZIP_FILES=$(unzip -Z1 $MC_ZIP_FILENAME | grep -v "/$")
     SEARCH_RESULTS=$(echo "$ZIP_FILES" | grep Minecraft.Windows.exe)
     if [ "$SEARCH_RESULTS" != "Minecraft.Windows.exe" ]; then
         echo "Invalid game contents: couldn't find Minecraft.Windows.exe at the top level. It should contain everything inside the Contents folder." && exit 1
@@ -60,7 +60,7 @@ install_minecraft() {
         echo "Target installation directory is not empty. Aborting installation." && exit 1
     fi
     NUM_FILES=$(echo "$ZIP_FILES" | wc -l)
-    unzip $MC_ZIP_FILENAME -d $MC_CONTENTS | print_progress $NUM_FILES
+    unzip $MC_ZIP_FILENAME -d $MC_CONTENTS | print_progress $((NUM_FILES+2)) # I think it adds a few more lines?
     echo "done."
 }
 
@@ -83,7 +83,7 @@ patch_curl() {
 }
 
 install_gdk_proton() {
-    echo -n "Installing GDK-Proton..."
+    echo "Installing GDK-Proton..."
     EXISTING_GE_COUNT=$(ls $HOME/.steam/root/compatibilitytools.d | grep -e '^GE' -e '^GDK' | wc -l)
     if [ "${EXISTING_GE_COUNT:-0}" -gt 0 ]; then
         echo "already installed." && return
@@ -99,7 +99,8 @@ install_gdk_proton() {
     if [ $? -ne 0 ]; then echo "Error downlading GDK-Proton" && exit 1; fi
 
     echo -n "Extracting... "
-    tar -zxf $PROTON_RELEASE_FILENAME -C $HOME/.steam/root/compatibilitytools.d
+    TAR_FILE_COUNT=$(tar -tf $PROTON_RELEASE_FILENAME | grep -v "/$")
+    tar -zxvf $PROTON_RELEASE_FILENAME -C $HOME/.steam/root/compatibilitytools.d | print_progress $TAR_FILE_COUNT
     echo "done."
 }
 
@@ -210,5 +211,3 @@ install_proxy_pass
 sign_in
 configure_proxy_pass
 post_install
-
-read -p "Press any key to exit." foo
