@@ -3,10 +3,39 @@ SCRIPT_DIR=$PWD
 
 MC_DIR=$HOME/Minecraft
 
+print_progress() {
+	NUM_LINES=$1
+	WIDTH=${2:-20}
+	awk 'BEGIN {
+		ORS=""
+		nLines='"$NUM_LINES"'
+		w='"$WIDTH"'
+		linesPerDot=int(nLines/w)
+	}
+
+	{
+		printf "\r["
+		i=0
+		for(; i<NR/linesPerDot && i<=w; i++){
+			printf "="
+		}
+		if(i<=w) {
+			print ">"
+			i++
+		}
+		for(; i<=w; i++) {
+			printf " "
+		}
+		printf("] %*d/%d (%02d%)", length(nLines), NR, nLines, int((NR/nLines)*100))
+	}'
+    echo ""
+}
+
 get_input() {
     read -p "Enter filename of the zipped Minecraft contents or press enter for the default [MCWindows.zip]: " MC_ZIP_FILENAME
     MC_ZIP_FILENAME=${MC_ZIP_FILENAME:-"MCWindows.zip"}
-    SEARCH_RESULTS=$(unzip -Z1 $MC_ZIP_FILENAME | grep Minecraft.Windows.exe)
+    ZIP_FILES=$(unzip -Z1 $MC_ZIP_FILENAME)
+    SEARCH_RESULTS=$(echo "$ZIP_FILES" | grep Minecraft.Windows.exe)
     if [ "$SEARCH_RESULTS" != "Minecraft.Windows.exe" ]; then
         echo "Invalid game contents: couldn't find Minecraft.Windows.exe at the top level. It should contain everything inside the Contents folder." && exit 1
     fi
@@ -18,14 +47,15 @@ get_input() {
 }
 
 install_minecraft() {
-    echo -n "Extracting Minecraft... "
+    echo "Extracting Minecraft..."
     MC_CONTENTS=$MC_DIR/Contents
     mkdir -p $MC_CONTENTS
     MC_CONTENTS_FILES=$(ls -A $MC_CONTENTS)
     if [ -n "$MC_CONTENTS_FILES" ]; then
         echo "Target installation directory is not empty. Aborting installation." && exit 1
     fi
-    unzip $MC_ZIP_FILENAME -d $MC_CONTENTS
+    NUM_FILES=$(echo "$ZIP_FILES" | wc -l)
+    unzip $MC_ZIP_FILENAME -d $MC_CONTENTS | print_progress $NUM_FILES
     echo "done."
 }
 
