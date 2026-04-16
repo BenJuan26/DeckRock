@@ -36,31 +36,73 @@ print_progress() {
     echo ""
 }
 
+handle_abort() {
+    abort=${abort:-"N"}
+    if [ "$abort" = "y" ] || [ "$abort" = "Y" ]; then exit 0; fi
+    if [ "$abort" != "n" ] && [ "$abort" != "N" ]; then
+        echo "Unknown option $abort" && exit 1
+    fi
+    echo "Aborting installation."
+    exit 0
+}
+
+check_existing_minecraft() {
+    local abort
+    if [ -n "$MC_CONTENT_FILES" ]; then
+        SKIP_MC=true
+        read -p "There are already files in the Minecraft Content folder. Continue installation with existing Minecraft version? (y/N) " abort
+    fi
+    handle_abort
+}
+
+check_existing_proton() {
+    EXISTING_GE_COUNT=$(ls $HOME/.steam/root/compatibilitytools.d | grep -e '^GE' -e '^GDK' | wc -l)
+    local abort
+    if [ "${EXISTING_GE_COUNT:-0}" -gt 0 ]; then
+        SKIP_PROTON=true
+        echo "There is at least one existing version of GE-Proton installed. It MUST be the Weather-OS GDK-Proton version, or the game will not run."
+        read -p "Continue installation with existing GE-Proton version? (y/N) " abort
+    fi
+    handle_abort
+}
+
+check_existing_proxy_pass() {
+    PROXY_PASS_DIR=$HOME/ProxyPass
+    if [ -f $PROXY_PASS_DIR ]; then
+        echo "The ProxyPass folder ($PROXY_PASS_DIR) already exists. Only a fresh installation will work properly."
+        echo "Remove or back up the existing folder and run the installation again."
+        exit 1
+    fi
+}
+
 get_input() {
-    read -e -p "Enter filename of the zipped Minecraft contents or press enter for the default [MCWindows.zip]: " MC_ZIP_FILENAME
+    read -e -p "Enter filename of the zipped Minecraft content or press enter for the default [MCWindows.zip]: " MC_ZIP_FILENAME
     MC_ZIP_FILENAME=${MC_ZIP_FILENAME:-"MCWindows.zip"}
     ZIP_FILES=$(unzip -Z1 $MC_ZIP_FILENAME)
     SEARCH_RESULTS=$(echo "$ZIP_FILES" | grep Minecraft.Windows.exe)
     if [ "$SEARCH_RESULTS" != "Minecraft.Windows.exe" ]; then
-        echo "Invalid game contents: couldn't find Minecraft.Windows.exe at the top level. It should contain everything inside the Contents folder." && exit 1
+        echo "Invalid game content: couldn't find Minecraft.Windows.exe at the top level. It should contain everything inside the Content folder." && exit 1
     fi
 
     read -p "Enter the hostname or IP address of the destination server: " PROXY_PASS_DESTINATION_HOST
     if [ -z "$PROXY_PASS_DESTINATION_HOST" ]; then
         echo "Must provide a non-empty host/IP for the destination server." && exit 1
     fi
+
+    MC_CONTENT=$MC_DIR/Content
+    mkdir -p $MC_CONTENT
+    MC_CONTENT_FILES=$(ls -A $MC_CONTENT)
+
+    check_existing_minecraft
+    check_existing_proton
+    check_existing_proxy_pass
 }
 
 install_minecraft() {
+    if [ "$SKIP_MC" = "true" ]; then return; fi
     echo "Extracting Minecraft..."
-    MC_CONTENTS=$MC_DIR/Contents
-    mkdir -p $MC_CONTENTS
-    MC_CONTENTS_FILES=$(ls -A $MC_CONTENTS)
-    if [ -n "$MC_CONTENTS_FILES" ]; then
-        echo "Target installation directory is not empty. Aborting installation." && exit 1
-    fi
     NUM_FILES=$(echo "$ZIP_FILES" | wc -l)
-    unzip $MC_ZIP_FILENAME -d $MC_CONTENTS | print_progress $((NUM_FILES+1)) # I think it adds a line?
+    unzip $MC_ZIP_FILENAME -d $MC_CONTENT | print_progress $((NUM_FILES+1))
     echo "done."
 }
 
@@ -72,7 +114,7 @@ patch_curl() {
     LIBCURL_FILE_PATH="mingw64/bin/libcurl-4.dll"
     tar -xf mingw-w64-x86_64-curl-8.17.0-1-any.pkg.tar.zst $LIBCURL_FILE_PATH
     # Overwrite built-in XCurl.dll
-    mv $LIBCURL_FILE_PATH $MC_CONTENTS/XCurl.dll
+    mv $LIBCURL_FILE_PATH $MC_CONTENT/XCurl.dll
 
     CERTS_DIR=$MC_DIR/etc/ssl/certs
     mkdir -p $CERTS_DIR
@@ -83,11 +125,8 @@ patch_curl() {
 }
 
 install_gdk_proton() {
+    if [ "$SKIP_PROTON" = true ]; then return; fi
     echo "Installing GDK-Proton..."
-    EXISTING_GE_COUNT=$(ls $HOME/.steam/root/compatibilitytools.d | grep -e '^GE' -e '^GDK' | wc -l)
-    if [ "${EXISTING_GE_COUNT:-0}" -gt 0 ]; then
-        echo "already installed." && return
-    fi
 
     PROTON_RELEASE_INFO=$(curl -s https://api.github.com/repos/Weather-OS/GDK-Proton/releases/latest)
     PROTON_RELEASE_URL=$(echo "$PROTON_RELEASE_INFO" | jq -r .assets[0].browser_download_url)
@@ -121,22 +160,24 @@ install_java() {
 
     echo -n "Extracting... "
     JDK_DIR_NAME=$(tar -ztf $JAVA_RELEASE_FILENAME | head -1)
+    JDK_DIR_NAME=${JDK_DIR_NAME%/}
     tar -zxf $JAVA_RELEASE_FILENAME -C $HOME/.local
 
     export JAVA_HOME=$HOME/.local/$JDK_DIR_NAME
-    echo "JAVA_HOME=$HOME/.local/$JDK_DIR_NAME" >> $HOME/.bash_profile
-    echo 'PATH=$PATH:$JAVA_HOME/bin' >> $HOME/.bash_profile
+    echo "export JAVA_HOME=$JAVA_HOME" >> $HOME/.bash_profile
+    echo 'export PATH=$PATH:$JAVA_HOME/bin' >> $HOME/.bash_profile
     JAVA_EXE=$JAVA_HOME/bin/java
     echo "done."
 }
 
 install_proxy_pass() {
     echo -n "Installing ProxyPass... "
-    PROXY_PASS_DIR=$HOME/ProxyPass
+    
     wget -q https://github.com/Kas-tle/ProxyPass/releases/latest/download/ProxyPass.jar
     if [ $? -ne 0 ]; then echo "Error downloading ProxyPass" && exit 1; fi
     mkdir -p $PROXY_PASS_DIR
     mv ProxyPass.jar $PROXY_PASS_DIR/
+    chmod +x wrapper.sh
     mv wrapper.sh $PROXY_PASS_DIR/
     echo "done."
 }
@@ -185,14 +226,15 @@ configure_proxy_pass() {
 
 post_install() {
     echo "Installation complete!
-The next steps MUST be done manually:
+The next steps MUST be done manually, in this order:
 
 1. Fully restart steam.
-2. Navigate to $MC_CONTENTS, right-click Minecraft.Windows.exe and select Add to Steam.
+2. Navigate to $MC_CONTENT, right-click Minecraft.Windows.exe, and select Add to Steam.
 3. Go to the Steam library, right-click the newly added shortcut, and click Properties.
-4. Enter this text in the Launch Options box:
+4. Under Compatibility, choose the added GE-Proton version (e.g. GE-Proton10-32).
+5. Run the game through Steam (desktop mode is fine). Use the Steam button to move the mouse to the green Install button and click it. The game will close.
+6. Go back to the game properties in Steam. Enter this text in the Launch Options box:
 $PROXY_PASS_DIR/wrapper.sh %command%
-5. Under Compatibility, choose the added GE-Proton version (e.g. GE-Proton10-32).
 
 Once that is complete, you're finished! The game can be launched normally through Steam in Gaming Mode.
 ProxyPass only run while the game is running.

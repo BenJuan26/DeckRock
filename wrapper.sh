@@ -2,6 +2,8 @@
 DIR=$PWD
 CMD=$@
 
+source $HOME/.bash_profile
+
 cd $HOME/ProxyPass
 java -jar ProxyPass.jar &
 PID=$!
