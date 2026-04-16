@@ -39,7 +39,7 @@ print_progress() {
 get_input() {
     read -e -p "Enter filename of the zipped Minecraft contents or press enter for the default [MCWindows.zip]: " MC_ZIP_FILENAME
     MC_ZIP_FILENAME=${MC_ZIP_FILENAME:-"MCWindows.zip"}
-    ZIP_FILES=$(unzip -Z1 $MC_ZIP_FILENAME | grep -v "/$")
+    ZIP_FILES=$(unzip -Z1 $MC_ZIP_FILENAME)
     SEARCH_RESULTS=$(echo "$ZIP_FILES" | grep Minecraft.Windows.exe)
     if [ "$SEARCH_RESULTS" != "Minecraft.Windows.exe" ]; then
         echo "Invalid game contents: couldn't find Minecraft.Windows.exe at the top level. It should contain everything inside the Contents folder." && exit 1
@@ -60,7 +60,7 @@ install_minecraft() {
         echo "Target installation directory is not empty. Aborting installation." && exit 1
     fi
     NUM_FILES=$(echo "$ZIP_FILES" | wc -l)
-    unzip $MC_ZIP_FILENAME -d $MC_CONTENTS | print_progress $((NUM_FILES+2)) # I think it adds a few more lines?
+    unzip $MC_ZIP_FILENAME -d $MC_CONTENTS | print_progress $((NUM_FILES+1)) # I think it adds a line?
     echo "done."
 }
 
@@ -99,7 +99,7 @@ install_gdk_proton() {
     if [ $? -ne 0 ]; then echo "Error downlading GDK-Proton" && exit 1; fi
 
     echo -n "Extracting... "
-    TAR_FILE_COUNT=$(tar -tf $PROTON_RELEASE_FILENAME | grep -v "/$")
+    TAR_FILE_COUNT=$(tar -tf $PROTON_RELEASE_FILENAME | wc -l)
     tar -zxvf $PROTON_RELEASE_FILENAME -C $HOME/.steam/root/compatibilitytools.d | print_progress $TAR_FILE_COUNT
     echo "done."
 }
@@ -188,7 +188,7 @@ post_install() {
 The next steps MUST be done manually:
 
 1. Fully restart steam.
-2. Navigate to $MC_CONTENT, right-click Minecraft.Windows.exe and select Add to Steam.
+2. Navigate to $MC_CONTENTS, right-click Minecraft.Windows.exe and select Add to Steam.
 3. Go to the Steam library, right-click the newly added shortcut, and click Properties.
 4. Enter this text in the Launch Options box:
 $PROXY_PASS_DIR/wrapper.sh %command%
