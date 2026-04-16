@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 SCRIPT_DIR=$PWD
 
 MC_DIR=$HOME/Minecraft
@@ -78,7 +78,7 @@ patch_curl() {
 }
 
 install_gdk_proton() {
-    echo -n "Installing GDK-Proton... "
+    echo -n "Installing GDK-Proton..."
     EXISTING_GE_COUNT=$(ls $HOME/.steam/root/compatibilitytools.d | grep -e '^GE' -e '^GDK' | wc -l)
     if [ "${EXISTING_GE_COUNT:-0}" -gt 0 ]; then
         echo "already installed." && return
@@ -88,10 +88,12 @@ install_gdk_proton() {
     PROTON_RELEASE_URL=$(echo "$PROTON_RELEASE_INFO" | jq -r .assets[0].browser_download_url)
     if [ $? -ne 0 ]; then echo "Couldn't find a valid release for GDK-Proton" && exit 1; fi
 
+    echo "Downloading..."
     PROTON_RELEASE_FILENAME=$(echo "$PROTON_RELEASE_INFO" | jq -r .assets[0].name)
-    wget -q $PROTON_RELEASE_URL
+    wget -q --show-progress $PROTON_RELEASE_URL
     if [ $? -ne 0 ]; then echo "Error downlading GDK-Proton" && exit 1; fi
 
+    echo -n "Extracting... "
     tar -zxf $PROTON_RELEASE_FILENAME -C $HOME/.steam/root/compatibilitytools.d
     echo "done."
 }
@@ -107,9 +109,11 @@ install_java() {
     JAVA_RELEASE_JSON=$(echo $JAVA_RELEASE_FULL_JSON | jq '.assets[] | select (.name | test("jdk_x64_linux_hotspot.*tar.gz$"))')
     JAVA_RELEASE_URL=$(echo $JAVA_RELEASE_JSON | jq -r .browser_download_url)
     JAVA_RELEASE_FILENAME=$(echo $JAVA_RELEASE_JSON | jq -r .name)
-    wget -q $JAVA_RELEASE_URL
+    echo -e "\nDownloading..."
+    wget -q --show-progress $JAVA_RELEASE_URL
     if [ $? -ne 0 ]; then echo "Error downloading JDK" && exit 1; fi
 
+    echo -n "Extracting... "
     JDK_DIR_NAME=$(tar -ztf $JAVA_RELEASE_FILENAME | head -1)
     tar -zxf $JAVA_RELEASE_FILENAME -C $HOME/.local
 
