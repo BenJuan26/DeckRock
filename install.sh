@@ -64,9 +64,10 @@ patch_curl() {
     # this might not work because of cloudflare
     wget -q https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-curl-8.17.0-1-any.pkg.tar.zst
     if [ $? -ne 0 ]; then echo "Error downloading MinGW-cURL" && exit 1; fi
-    tar -xf mingw-w64-x86_64-curl-8.17.0-1-any.pkg.tar.zst mingw64/bin/libcurl-4.dll
+    LIBCURL_FILE_PATH=$(mingw64/bin/libcurl-4.dll)
+    tar -xf mingw-w64-x86_64-curl-8.17.0-1-any.pkg.tar.zst $LIBCURL_FILE_PATH
     # Overwrite built-in XCurl.dll
-    mv libcurl-4.dll $MC_CONTENTS/XCurl.dll
+    mv $LIBCURL_FILE_PATH $MC_CONTENTS/XCurl.dll
 
     CERTS_DIR=$MC_DIR/etc/ssl/certs
     mkdir -p $CERTS_DIR
@@ -148,8 +149,12 @@ sign_in() {
     echo "Code is $MS_CODE"
     echo "It has been copied to your clipboard."
     echo "Now opening the browser to sign in. Paste the code that has been copied."
+    echo ""
     echo "If the browser does not open, navigate to https://www.microsoft.com/link"
-    echo -n "Waiting for link to complete... "
+    echo -n "Waiting for sign-in to complete... "
+
+    # Wait a bit before opening so the user can read what's on the screen
+    sleep 3
 
     xdg-open https://www.microsoft.com/link
     while [ ! -f auth.json ]; do
@@ -161,33 +166,30 @@ sign_in() {
 }
 
 configure_proxy_pass() {
+    # Target the standard port to ensure LAN discovery
+    sed -i '/proxy/,${/port\: .*/{s/port: .*/port\: 19132/; :a; n; ba}}' config.yml
     # Apply the host to the proxy config
     sed -i '/destination/,${/host\: .*/{s/host: .*/host\: '"${PROXY_PASS_DESTINATION_HOST}"'/; :a; n; ba}}' config.yml
     echo "Configuration updated."
 }
 
 post_install() {
-    MSG=$(cat <<EOF
-Installation complete!
-
+    echo "Installation complete!
 The next steps MUST be done manually:
-1. Fully restart steam.
-2. Navigate to $MC_CONTENT
-3. Right-click Minecraft.Windows.exe and select Add to Steam.
-4. Go to the Steam library, right-click the newly added shortcut, and click Properties.
-5. Enter this text in the Launch Options box:
-$PROXY_PASS_DIR/wrapper.sh %command%
-6. Under Compatibility, choose the added GE-Proton version (e.g. GE-Proton10-32).
 
-Once that is complete, you're finished! The game can be launched normally through Steam.
-ProxyPass will start up before Minecraft launches and shut down after it exits.
-To change which server it is pointing to, change the 'host' value under 'destination' in the config file, which is located here:
+1. Fully restart steam.
+2. Navigate to $MC_CONTENT, right-click Minecraft.Windows.exe and select Add to Steam.
+3. Go to the Steam library, right-click the newly added shortcut, and click Properties.
+4. Enter this text in the Launch Options box:
+$PROXY_PASS_DIR/wrapper.sh %command%
+5. Under Compatibility, choose the added GE-Proton version (e.g. GE-Proton10-32).
+
+Once that is complete, you're finished! The game can be launched normally through Steam in Gaming Mode.
+ProxyPass only run while the game is running.
+To change which server it's pointing to, change the 'host' value under 'destination' in the config file, which is located here:
 $PROXY_PASS_DIR/config.yml
 
-Punch wood, get good!
-EOF
-    )
-    echo "$MSG"
+Punch wood, get good!"
 }
 
 get_input
