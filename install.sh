@@ -6,14 +6,16 @@ MC_DIR=$HOME/Minecraft
 print_progress() {
 	NUM_LINES=$1
 	WIDTH=${2:-20}
-	awk 'BEGIN {
+	awk -v nLines=$NUM_LINES -v w=$WIDTH 'BEGIN {
 		ORS=""
-		nLines='"$NUM_LINES"'
-		w='"$WIDTH"'
 		linesPerDot=int(nLines/w)
+        interval=int(nLines/1000)
 	}
 
 	{
+        if(NR<nLines && NR%interval != 0) {
+            next
+        }
 		printf "\r["
 		i=0
 		for(; i<NR/linesPerDot && i<=w; i++){
@@ -64,7 +66,7 @@ patch_curl() {
     # this might not work because of cloudflare
     wget -q https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-curl-8.17.0-1-any.pkg.tar.zst
     if [ $? -ne 0 ]; then echo "Error downloading MinGW-cURL" && exit 1; fi
-    LIBCURL_FILE_PATH=$(mingw64/bin/libcurl-4.dll)
+    LIBCURL_FILE_PATH="mingw64/bin/libcurl-4.dll"
     tar -xf mingw-w64-x86_64-curl-8.17.0-1-any.pkg.tar.zst $LIBCURL_FILE_PATH
     # Overwrite built-in XCurl.dll
     mv $LIBCURL_FILE_PATH $MC_CONTENTS/XCurl.dll
