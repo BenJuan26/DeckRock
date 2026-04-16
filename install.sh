@@ -36,34 +36,32 @@ print_progress() {
     echo ""
 }
 
-handle_abort() {
-    abort=${abort:-"N"}
-    if [ "$abort" = "y" ] || [ "$abort" = "Y" ]; then exit 0; fi
-    if [ "$abort" != "n" ] && [ "$abort" != "N" ]; then
-        echo "Unknown option $abort" && exit 1
+handle_continue() {
+    continue=${continue:-"N"}
+    if [ "$continue" = "n" ] || [ "$continue" = "N" ]; then echo "Aborting installation." && exit 0; fi
+    if [ "$continue" != "y" ] && [ "$continue" != "Y" ]; then
+        echo "Unknown option $continue" && exit 1
     fi
-    echo "Aborting installation."
-    exit 0
 }
 
 check_existing_minecraft() {
-    local abort
+    local continue
     if [ -n "$MC_CONTENT_FILES" ]; then
         SKIP_MC=true
-        read -p "There are already files in the Minecraft Content folder. Continue installation with existing Minecraft version? (y/N) " abort
+        read -p "There are already files in the Minecraft Content folder. Continue installation with existing Minecraft version? (y/N) " continue
     fi
-    handle_abort
+    handle_continue
 }
 
 check_existing_proton() {
     EXISTING_GE_COUNT=$(ls $HOME/.steam/root/compatibilitytools.d | grep -e '^GE' -e '^GDK' | wc -l)
-    local abort
+    local continue
     if [ "${EXISTING_GE_COUNT:-0}" -gt 0 ]; then
         SKIP_PROTON=true
         echo "There is at least one existing version of GE-Proton installed. It MUST be the Weather-OS GDK-Proton version, or the game will not run."
-        read -p "Continue installation with existing GE-Proton version? (y/N) " abort
+        read -p "Continue installation with existing GE-Proton version? (y/N) " continue
     fi
-    handle_abort
+    handle_continue
 }
 
 check_existing_proxy_pass() {
