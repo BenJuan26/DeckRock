@@ -10,6 +10,9 @@ print_progress() {
 		ORS=""
 		linesPerDot=int(nLines/w)
         interval=int(nLines/1000)
+        if(interval==0) {
+			interval=1
+		}
 	}
 
 	{
@@ -18,14 +21,14 @@ print_progress() {
         }
 		printf "\r["
 		i=0
-		for(; i<NR/linesPerDot && i<=w; i++){
+		for(; i<NR/linesPerDot-1 && i<w; i++){
 			printf "="
 		}
-		if(i<=w) {
+		if(i<w) {
 			print ">"
 			i++
 		}
-		for(; i<=w; i++) {
+		for(; i<w; i++) {
 			printf " "
 		}
 		printf("] %*d/%d (%02d%)", length(nLines), NR, nLines, int((NR/nLines)*100))
