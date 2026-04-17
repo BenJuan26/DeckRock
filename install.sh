@@ -45,17 +45,17 @@ handle_continue() {
 }
 
 check_existing_minecraft() {
-    local continue
-    if [ -n "$MC_CONTENT_FILES" ]; then
+    local continue=y
+    if [ -f "$MC_CONTENT" ]; then
         SKIP_MC=true
-        read -p "There are already files in the Minecraft Content folder. Continue installation with existing Minecraft version? (y/N) " continue
+        read -p "The Minecraft Content folder already exists. Continue installation with existing Minecraft version? (y/N) " continue
     fi
     handle_continue
 }
 
 check_existing_proton() {
     EXISTING_GE_COUNT=$(ls $HOME/.steam/root/compatibilitytools.d | grep -e '^GE' -e '^GDK' | wc -l)
-    local continue
+    local continue=y
     if [ "${EXISTING_GE_COUNT:-0}" -gt 0 ]; then
         SKIP_PROTON=true
         echo "There is at least one existing version of GE-Proton installed. It MUST be the Weather-OS GDK-Proton version, or the game will not run."
@@ -88,8 +88,6 @@ get_input() {
     fi
 
     MC_CONTENT=$MC_DIR/Content
-    mkdir -p $MC_CONTENT
-    MC_CONTENT_FILES=$(ls -A $MC_CONTENT)
 
     check_existing_minecraft
     check_existing_proton
@@ -99,6 +97,7 @@ get_input() {
 install_minecraft() {
     if [ "$SKIP_MC" = "true" ]; then return; fi
     echo "Extracting Minecraft..."
+    mkdir -p $MC_CONTENT
     NUM_FILES=$(echo "$ZIP_FILES" | wc -l)
     unzip $MC_ZIP_FILENAME -d $MC_CONTENT | print_progress $((NUM_FILES+1))
     echo "done."
@@ -203,7 +202,7 @@ sign_in() {
     echo -n "Waiting for sign-in to complete... "
 
     # Wait a bit before opening so the user can read what's on the screen
-    sleep 3
+    sleep 2
 
     xdg-open https://www.microsoft.com/link
     while [ ! -f auth.json ]; do
