@@ -242,6 +242,7 @@ configure_proxy_pass() {
     # Apply the host to the proxy config
     sed -i '/destination/,${/host\: .*/{s/host: .*/host\: '"${PROXY_PASS_DESTINATION_HOST}"'/; :a; n; ba}}' config.yml
     echo "Configuration updated."
+    cd $SCRIPT_DIR
 }
 
 post_install() {
