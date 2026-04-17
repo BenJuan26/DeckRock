@@ -3,6 +3,29 @@ SCRIPT_DIR=$PWD
 
 MC_DIR=$HOME/Minecraft
 
+find_app_id() {
+    USER_ID=$(ls $HOME/.steam/steam/userdata)
+    SHORTCUTS_VDF=$HOME/.steam/steam/userdata/$USER_ID/config/shortcuts.vdf
+    local APP_ID=$(python3 readsc/readsc.py $SHORTCUTS_VDF | jq -r '.shortcuts[] | select(.AppName == "Minecraft.Windows.exe") | .appid')
+    if [ $? -ne 0 ]; then return; fi
+    echo $APP_ID
+}
+
+wait_for_app_id() {
+    echo "The script will now pause for you to add Minecraft as a non-Steam game."
+    echo "The Content folder will now open. Right-click Minecraft.Windows.exe and click Add to Steam, then the script will continue."
+    echo -n "Waiting for shortcut... "
+    sleep 3
+    xdg-open $MC_CONTENT
+    APP_ID=
+    while [ -z "$APP_ID" ]; do
+        APP_ID=$(find_app_id)
+        sleep 1
+    done
+    echo "done."
+    echo "App ID is $APP_ID"
+}
+
 print_progress() {
 	NUM_LINES=$1
 	WIDTH=${2:-20}
@@ -223,22 +246,42 @@ configure_proxy_pass() {
 
 post_install() {
     echo "Installation complete!
-The next steps MUST be done manually, in this order:
-
-1. Fully restart steam.
-2. Navigate to $MC_CONTENT, right-click Minecraft.Windows.exe, and select Add to Steam.
-3. Go to the Steam library, right-click the newly added shortcut, and click Properties.
-4. Under Compatibility, choose the added GE-Proton version (e.g. GE-Proton10-32).
-5. Run the game through Steam (desktop mode is fine). Use the Steam button to move the mouse to the green Install button and click it. The game will close.
-6. Go back to the game properties in Steam. Enter this text in the Launch Options box:
+In order to launch ProxyPass every time the game launches:
+Go back to the game properties in Steam. Enter this text in the Launch Options box:
 $PROXY_PASS_DIR/wrapper.sh %command%
 
 Once that is complete, you're finished! The game can be launched normally through Steam in Gaming Mode.
-ProxyPass only run while the game is running.
+ProxyPass will only run while the game is running.
 To change which server it's pointing to, change the 'host' value under 'destination' in the config file, which is located here:
 $PROXY_PASS_DIR/config.yml
 
 Punch wood, get good!"
+}
+
+wait_for_options() {
+    echo 'Next steps:
+1. Fully restart Steam.
+2. Go to the Steam library, right-click on Minecraft.Windows.exe, and click Properties.
+3. Under Compatibility, choose the added GE-Proton version (e.g. GE-Proton10-32).
+4. Run the game through Steam (desktop mode is fine).
+5. Use the Steam button to move the mouse to the green Install button and click it. The game will close.'
+    echo -n "Waiting for install to finish... "
+    PFX_DIR=$HOME/.steam/steam/steamapps/compatdata/$APP_ID/pfx
+    APP_DATA=$PFX_DIR/drive_c/users/steamuser/AppData/Roaming
+    OPTIONS_TXT="$APP_DATA/Minecraft Bedrock/Users/Shared/games/com.mojang/minecraftpe/options.txt"
+    while [ ! -f $OPTIONS_TXT ]; do sleep 1; done
+    echo "done."
+}
+
+wait_for_app_close() {
+    echo -n "Waiting for Minecraft to close... "
+    MC_PROCESSES=$(ps -ef | grep [M]inecraft.Windows.exe | wc -l)
+    while [ ${MC_PROCESSES:-9999} -ne 0 ]; do sleep 1; done
+    echo "done."
+}
+
+modify_options() {
+    sed -i 's/do_not_show_multiplayer_online_safety_warning:0/do_not_show_multiplayer_online_safety:1/g' $OPTIONS_TXT
 }
 
 get_input
@@ -249,4 +292,8 @@ install_java
 install_proxy_pass
 sign_in
 configure_proxy_pass
+wait_for_app_id
+wait_for_options
+wait_for_app_close
+modify_options
 post_install
