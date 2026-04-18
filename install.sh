@@ -6,7 +6,8 @@ MC_DIR=$HOME/Minecraft
 find_app_id() {
     USER_ID=$(ls $HOME/.steam/steam/userdata)
     SHORTCUTS_VDF=$HOME/.steam/steam/userdata/$USER_ID/config/shortcuts.vdf
-    local APP_ID=$(python3 readsc/readsc.py $SHORTCUTS_VDF | jq -r '.shortcuts[] | select(.AppName == "Minecraft.Windows.exe") | .appid')
+    EXE_NAME="Minecraft.Windows.exe"
+    local APP_ID=$(python3 readsc/readsc.py $SHORTCUTS_VDF | jq -r '.shortcuts[] | select(.AppName == "$EXE_NAME" or .appname == "$EXE_NAME) | .appid')
     if [ $? -ne 0 ]; then return; fi
     echo $APP_ID
 }
