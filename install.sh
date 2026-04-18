@@ -2,12 +2,13 @@
 SCRIPT_DIR=$PWD
 
 MC_DIR=$HOME/Minecraft
+EXE_NAME="Minecraft.Windows.exe"
 
 find_app_id() {
     USER_ID=$(ls $HOME/.steam/steam/userdata)
     SHORTCUTS_VDF=$HOME/.steam/steam/userdata/$USER_ID/config/shortcuts.vdf
     EXE_NAME="Minecraft.Windows.exe"
-    local APP_ID=$(python3 readsc/readsc.py $SHORTCUTS_VDF | jq -r '.shortcuts[] | select(.AppName == "$EXE_NAME" or .appname == "$EXE_NAME) | .appid')
+    local APP_ID=$(python3 readsc/readsc.py $SHORTCUTS_VDF | jq -r '.shortcuts[] | select(.AppName == "$EXE_NAME" or .appname == "$EXE_NAME") | .appid')
     if [ $? -ne 0 ]; then return; fi
     echo $APP_ID
 }
@@ -101,9 +102,9 @@ get_input() {
     read -e -p "Enter filename of the zipped Minecraft content or press enter for the default [MCWindows.zip]: " MC_ZIP_FILENAME
     MC_ZIP_FILENAME=${MC_ZIP_FILENAME:-"MCWindows.zip"}
     ZIP_FILES=$(unzip -Z1 $MC_ZIP_FILENAME)
-    SEARCH_RESULTS=$(echo "$ZIP_FILES" | grep Minecraft.Windows.exe)
-    if [ "$SEARCH_RESULTS" != "Minecraft.Windows.exe" ]; then
-        echo "Invalid game content: couldn't find Minecraft.Windows.exe at the top level. It should contain everything inside the Content folder." && exit 1
+    SEARCH_RESULTS=$(echo "$ZIP_FILES" | grep $EXE_NAME)
+    if [ "$SEARCH_RESULTS" != "$EXE_NAME" ]; then
+        echo "Invalid game content: couldn't find $EXE_NAME at the top level. It should contain everything inside the Content folder." && exit 1
     fi
 
     read -p "Enter the hostname or IP address of the destination server: " PROXY_PASS_DESTINATION_HOST
