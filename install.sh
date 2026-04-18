@@ -280,7 +280,7 @@ wait_for_app_close() {
 }
 
 modify_options() {
-    sed -i 's/do_not_show_multiplayer_online_safety_warning:0/do_not_show_multiplayer_online_safety:1/g' "$OPTIONS_TXT"
+    sed -i 's/do_not_show_multiplayer_online_safety_warning:0/do_not_show_multiplayer_online_safety_warning:1/g' "$OPTIONS_TXT"
 }
 
 get_input
