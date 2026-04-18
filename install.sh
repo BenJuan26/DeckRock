@@ -8,8 +8,14 @@ SHORTCUTS_VDF=$HOME/.steam/steam/userdata/$USER_ID/config/shortcuts.vdf
 MC_CONTENT=$MC_DIR/Content
 
 wait_for_app_id() {
-    echo "The script will now pause for you to add Minecraft as a non-Steam game."
-    echo "The Content folder will now open. Right-click Minecraft.Windows.exe and click Add to Steam, then the script will continue."
+    echo "
+####################################################
+##            ADD MINECRAFT TO STEAM:             ##
+## 1. The Content folder will open in a moment.   ##
+## 2. Right-click Minecraft.Windows.exe.          ##
+## 3. Click Add to Steam.                         ##
+## 4. Come back here when that's finished.        ##
+####################################################"
     echo -n "Waiting for shortcut... "
     sleep 3
     xdg-open $MC_CONTENT
@@ -65,12 +71,11 @@ handle_continue() {
 }
 
 check_existing_minecraft() {
-    local continue=y
     if [ -f "$MC_CONTENT" ]; then
-        SKIP_MC=true
-        read -p "The Minecraft Content folder already exists. Continue installation with existing Minecraft version? (y/N) " continue
+        echo "The Minecraft Content folder already exists. Only a fresh installation will work properly"
+        echo "Remove or back up the existing folder and run the installation again."
+        exit 1
     fi
-    handle_continue
 }
 
 check_existing_proton() {
@@ -198,11 +203,12 @@ install_proxy_pass() {
 }
 
 sign_in() {
-    # Run ProxyPass once to generate config and potentially log in
+    # Run ProxyPass once to generate config and log in
     cd $PROXY_PASS_DIR
     $JAVA_EXE -jar ProxyPass.jar > output.log 2>&1 &
     PP_PID=$!
-    echo "Waiting for link code..."
+    echo "Started ProxyPass."
+    echo "Waiting for it to generate link code..."
     MS_CODE=""
     while [ -z "$MS_CODE" ]; do
         MS_CODE=$(cat output.log | sed -rn 's/.*Enter code ([A-Z0-9]{8})$/\1/p')
@@ -212,11 +218,16 @@ sign_in() {
     # Copy code to clipboard
     echo "$MS_CODE" | xargs qdbus org.kde.klipper /klipper org.kde.klipper.klipper.setClipboardContents
 
-    echo "Code is $MS_CODE"
-    echo "It has been copied to your clipboard."
-    echo "Now opening the browser to sign in. Paste the code that has been copied."
-    echo ""
-    echo "If the browser does not open, navigate to https://www.microsoft.com/link"
+    echo "
+############################################################################
+##                         SIGN IN WITH MICROSOFT                         ##
+############################################################################
+## 1. The link code is: $MS_CODE                                          ##
+## 2. It should be copied to your clipboard.                              ##
+## 3. The link should open in your default browser in a moment.           ##
+## 4. Paste the code and sign into your Microsoft account.                ##
+## 5. If the browser does not open, go to https://www.microsoft.com/link  ##
+############################################################################"
     echo -n "Waiting for sign-in to complete... "
 
     # Wait a bit before opening so the user can read what's on the screen
@@ -232,35 +243,30 @@ sign_in() {
 }
 
 configure_proxy_pass() {
+    echo -n "Configuring ProxyPass... "
     # Target the standard port to ensure LAN discovery
     sed -i '/proxy/,${/port\: .*/{s/port: .*/port\: 19132/; :a; n; ba}}' config.yml
     # Apply the host to the proxy config
     sed -i '/destination/,${/host\: .*/{s/host: .*/host\: '"${PROXY_PASS_DESTINATION_HOST}"'/; :a; n; ba}}' config.yml
-    echo "Configuration updated."
+    echo "done."
     cd $SCRIPT_DIR
 }
 
-post_install() {
-    echo "Installation complete!
-In order to launch ProxyPass every time the game launches:
-Go back to the game properties in Steam. Enter this text in the Launch Options box:
-$PROXY_PASS_DIR/wrapper.sh %command%
 
-Once that is complete, you're finished! The game can be launched normally through Steam in Gaming Mode.
-ProxyPass will only run while the game is running.
-To change which server it's pointing to, change the 'host' value under 'destination' in the config file, which is located here:
-$PROXY_PASS_DIR/config.yml
-
-Punch wood, get good!"
-}
 
 wait_for_options() {
-    echo 'Next steps:
-1. Fully restart Steam.
-2. Go to the Steam library, right-click on Minecraft.Windows.exe, and click Properties.
-3. Under Compatibility, choose the added GE-Proton version (e.g. GE-Proton10-32).
-4. Run the game through Steam (desktop mode is fine).
-5. Use the Steam button to move the mouse to the green Install button and click it. The game will close.'
+    echo "
+##################################################################################
+##           SELECT PROTON VERSION, RUN THE GAME, AND CLICK "INSTALL"           ##
+##################################################################################
+## 1. If GDK-Proton was installed for the first time, restart Steam.            ##
+## 2. Find Minecraft.Windows.exe in the Steam library.                          ##
+## 3. Right-click and select Properties.                                        ##
+## 4. Under Compatibility, choose the GE-Proton version (e.g. GE-Proton10-32).  ##
+## 5. Run the game.                                                             ##
+## 6. Click the green Install button. The game will close.                      ##
+## 7. Return here when that's finished.                                         ##
+##################################################################################"
     echo -n "Waiting for install to finish... "
     PFX_DIR="$HOME/.steam/steam/steamapps/compatdata/$APP_ID/pfx"
     APP_DATA="$PFX_DIR/drive_c/users/steamuser/AppData/Roaming"
@@ -280,7 +286,25 @@ wait_for_app_close() {
 }
 
 modify_options() {
+    echo -n "Tweaking game options... "
     sed -i 's/do_not_show_multiplayer_online_safety_warning:0/do_not_show_multiplayer_online_safety_warning:1/g' "$OPTIONS_TXT"
+    echo "done."
+}
+
+post_install() {
+    echo "
+##############################################################
+##             ADD PROXYPASS TO LAUNCH OPTIONS              ##
+##############################################################
+## 1. Go back to the Properties in the Steam library.       ##
+## 2. Copy the following and paste it into Launch Options.  ##
+$PROXY_PASS_DIR/wrapper.sh %command%
+##############################################################
+
+Once that is complete, you're finished! The game can be launched normally through Steam in Gaming Mode.
+ProxyPass will only run while the game is running.
+To change which server it's pointing to, change the 'host' value under 'destination' in the config file, which is located here:
+$PROXY_PASS_DIR/config.yml"
 }
 
 get_input
