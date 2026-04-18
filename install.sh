@@ -3,15 +3,9 @@ SCRIPT_DIR=$PWD
 
 MC_DIR=$HOME/Minecraft
 EXE_NAME="Minecraft.Windows.exe"
-
-find_app_id() {
-    USER_ID=$(ls $HOME/.steam/steam/userdata)
-    SHORTCUTS_VDF=$HOME/.steam/steam/userdata/$USER_ID/config/shortcuts.vdf
-    EXE_NAME="Minecraft.Windows.exe"
-    local APP_ID=$(python3 readsc/readsc.py $SHORTCUTS_VDF | jq -r '.shortcuts[] | select(.AppName == "$EXE_NAME" or .appname == "$EXE_NAME") | .appid')
-    if [ $? -ne 0 ]; then return; fi
-    echo $APP_ID
-}
+USER_ID=$(ls $HOME/.steam/steam/userdata)
+SHORTCUTS_VDF=$HOME/.steam/steam/userdata/$USER_ID/config/shortcuts.vdf
+MC_CONTENT=$MC_DIR/Content
 
 wait_for_app_id() {
     echo "The script will now pause for you to add Minecraft as a non-Steam game."
@@ -21,7 +15,8 @@ wait_for_app_id() {
     xdg-open $MC_CONTENT
     APP_ID=
     while [ -z "$APP_ID" ]; do
-        APP_ID=$(find_app_id)
+        SHORTCUTS=$(python3 readsc/readsc.py $SHORTCUTS_VDF)
+        APP_ID=$(echo $SHORTCUTS | jq -r ".shortcuts[] | select(.AppName == \"$EXE_NAME\" or .appname == \"$EXE_NAME\") | .appid")
         sleep 1
     done
     echo "done."
@@ -112,8 +107,6 @@ get_input() {
         echo "Must provide a non-empty host/IP for the destination server." && exit 1
     fi
 
-    MC_CONTENT=$MC_DIR/Content
-
     check_existing_minecraft
     check_existing_proton
     check_existing_proxy_pass
@@ -200,7 +193,7 @@ install_proxy_pass() {
     mkdir -p $PROXY_PASS_DIR
     mv ProxyPass.jar $PROXY_PASS_DIR/
     chmod +x wrapper.sh
-    mv wrapper.sh $PROXY_PASS_DIR/
+    cp wrapper.sh $PROXY_PASS_DIR/
     echo "done."
 }
 
@@ -269,22 +262,25 @@ wait_for_options() {
 4. Run the game through Steam (desktop mode is fine).
 5. Use the Steam button to move the mouse to the green Install button and click it. The game will close.'
     echo -n "Waiting for install to finish... "
-    PFX_DIR=$HOME/.steam/steam/steamapps/compatdata/$APP_ID/pfx
-    APP_DATA=$PFX_DIR/drive_c/users/steamuser/AppData/Roaming
+    PFX_DIR="$HOME/.steam/steam/steamapps/compatdata/$APP_ID/pfx"
+    APP_DATA="$PFX_DIR/drive_c/users/steamuser/AppData/Roaming"
     OPTIONS_TXT="$APP_DATA/Minecraft Bedrock/Users/Shared/games/com.mojang/minecraftpe/options.txt"
-    while [ ! -f $OPTIONS_TXT ]; do sleep 1; done
+    while [ ! -f "$OPTIONS_TXT" ]; do sleep 1; done
     echo "done."
 }
 
 wait_for_app_close() {
     echo -n "Waiting for Minecraft to close... "
-    MC_PROCESSES=$(ps -ef | grep [M]inecraft.Windows.exe | wc -l)
-    while [ ${MC_PROCESSES:-9999} -ne 0 ]; do sleep 1; done
+    MC_PROCESSES=9999
+    while [ $MC_PROCESSES -ne 0 ]; do
+        MC_PROCESSES=$(ps -ef | grep [M]inecraft.Windows.exe | wc -l)
+        sleep 1
+    done
     echo "done."
 }
 
 modify_options() {
-    sed -i 's/do_not_show_multiplayer_online_safety_warning:0/do_not_show_multiplayer_online_safety:1/g' $OPTIONS_TXT
+    sed -i 's/do_not_show_multiplayer_online_safety_warning:0/do_not_show_multiplayer_online_safety:1/g' "$OPTIONS_TXT"
 }
 
 get_input
